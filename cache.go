@@ -60,7 +60,7 @@ type Response struct {
 
 // Client data structure for HTTP cache middleware.
 type Client struct {
-	adapter    Adapter
+	Adapter    Adapter
 	ttl        time.Duration
 	refreshKey string
 }
@@ -86,24 +86,24 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" || r.Method == "" {
 			sortURLParams(r.URL)
-			key := generateKey(r.URL.String())
+			key := GenerateKey(r.URL.String())
 
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
 				delete(params, c.refreshKey)
 
 				r.URL.RawQuery = params.Encode()
-				key = generateKey(r.URL.String())
+				key = GenerateKey(r.URL.String())
 
-				c.adapter.Release(key)
+				c.Adapter.Release(key)
 			} else {
-				b, ok := c.adapter.Get(key)
+				b, ok := c.Adapter.Get(key)
 				response := BytesToResponse(b)
 				if ok {
 					if response.Expiration.After(time.Now()) {
 						response.LastAccess = time.Now()
 						response.Frequency++
-						c.adapter.Set(key, response.Bytes(), response.Expiration)
+						c.Adapter.Set(key, response.Bytes(), response.Expiration)
 
 						//w.WriteHeader(http.StatusNotModified)
 						for k, v := range response.Header {
@@ -113,7 +113,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 						return
 					}
 
-					c.adapter.Release(key)
+					c.Adapter.Release(key)
 				}
 			}
 
@@ -133,7 +133,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 					LastAccess: now,
 					Frequency:  1,
 				}
-				c.adapter.Set(key, response.Bytes(), response.Expiration)
+				c.Adapter.Set(key, response.Bytes(), response.Expiration)
 			}
 			for k, v := range result.Header {
 				w.Header().Set(k, strings.Join(v, ","))
@@ -174,7 +174,7 @@ func sortURLParams(URL *url.URL) {
 	URL.RawQuery = params.Encode()
 }
 
-func generateKey(URL string) uint64 {
+func GenerateKey(URL string) uint64 {
 	hash := fnv.New64a()
 	hash.Write([]byte(URL))
 
@@ -192,7 +192,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		}
 	}
 
-	if c.adapter == nil {
+	if c.Adapter == nil {
 		return nil, errors.New("cache client adapter is not set")
 	}
 	if int64(c.ttl) < 1 {
@@ -206,7 +206,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 // middleware client.
 func ClientWithAdapter(a Adapter) ClientOption {
 	return func(c *Client) error {
-		c.adapter = a
+		c.Adapter = a
 		return nil
 	}
 }
