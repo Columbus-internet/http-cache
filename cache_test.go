@@ -13,10 +13,10 @@ import (
 
 type adapterMock struct {
 	sync.Mutex
-	store map[uint64][]byte
+	store map[string][]byte
 }
 
-func (a *adapterMock) Get(key uint64) ([]byte, bool) {
+func (a *adapterMock) Get(key string) ([]byte, bool) {
 	a.Lock()
 	defer a.Unlock()
 	if _, ok := a.store[key]; ok {
@@ -25,13 +25,13 @@ func (a *adapterMock) Get(key uint64) ([]byte, bool) {
 	return nil, false
 }
 
-func (a *adapterMock) Set(key uint64, response []byte, expiration time.Time) {
+func (a *adapterMock) Set(key string, response []byte, expiration time.Time) {
 	a.Lock()
 	defer a.Unlock()
 	a.store[key] = response
 }
 
-func (a *adapterMock) Release(key uint64) {
+func (a *adapterMock) Release(key string) {
 	a.Lock()
 	defer a.Unlock()
 	delete(a.store, key)
@@ -44,16 +44,16 @@ func TestMiddleware(t *testing.T) {
 	})
 
 	adapter := &adapterMock{
-		store: map[uint64][]byte{
-			14974843192121052621: Response{
+		store: map[string][]byte{
+			"14974843192121052621": Response{
 				Value:      []byte("value 1"),
 				Expiration: time.Now().Add(1 * time.Minute),
 			}.Bytes(),
-			14974839893586167988: Response{
+			"14974839893586167988": Response{
 				Value:      []byte("value 2"),
 				Expiration: time.Now().Add(1 * time.Minute),
 			}.Bytes(),
-			14974840993097796199: Response{
+			"14974840993097796199": Response{
 				Value:      []byte("value 3"),
 				Expiration: time.Now().Add(-1 * time.Minute),
 			}.Bytes(),
@@ -243,22 +243,22 @@ func TestGenerateKey(t *testing.T) {
 	tests := []struct {
 		name string
 		URL  string
-		want uint64
+		want string
 	}{
 		{
 			"get url checksum",
 			"http://foo.bar/test-1",
-			14974843192121052621,
+			"14974843192121052621",
 		},
 		{
 			"get url 2 checksum",
 			"http://foo.bar/test-2",
-			14974839893586167988,
+			"14974839893586167988",
 		},
 		{
 			"get url 3 checksum",
 			"http://foo.bar/test-3",
-			14974840993097796199,
+			"14974840993097796199",
 		},
 	}
 	for _, tt := range tests {
