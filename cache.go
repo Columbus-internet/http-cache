@@ -34,7 +34,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -63,6 +65,9 @@ type Client struct {
 	adapter    Adapter
 	ttl        time.Duration
 	refreshKey string
+
+	mutex        sync.RWMutex
+	urisWithKeys map[string][]string
 }
 
 // ClientOption is used to set Client settings.
@@ -72,13 +77,13 @@ type ClientOption func(c *Client) error
 type Adapter interface {
 	// Get retrieves the cached response by a given key. It also
 	// returns true or false, whether it exists or not.
-	Get(key uint64) ([]byte, bool)
+	Get(key string) ([]byte, bool)
 
 	// Set caches a response for a given key until an expiration date.
-	Set(key uint64, response []byte, expiration time.Time)
+	Set(key string, response []byte, expiration time.Time)
 
 	// Release frees cache for a given key.
-	Release(key uint64)
+	Release(key string)
 }
 
 // Middleware is the HTTP cache middleware handler.
@@ -86,6 +91,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" || r.Method == "" {
 			sortURLParams(r.URL)
+			prefix := r.URL.Path + "_"
 			key := generateKey(r.URL.String())
 
 			params := r.URL.Query()
@@ -134,6 +140,9 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 					Frequency:  1,
 				}
 				c.adapter.Set(key, response.Bytes(), response.Expiration)
+				c.mutex.Lock()
+				c.urisWithKeys[prefix] = append(c.urisWithKeys[prefix], key)
+				c.mutex.Unlock()
 			}
 			for k, v := range result.Header {
 				w.Header().Set(k, strings.Join(v, ","))
@@ -144,6 +153,16 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ReleaseURI ...
+func (c *Client) ReleaseURI(uri string) {
+	c.mutex.RLock()
+	uris := c.urisWithKeys[uri]
+	c.mutex.RUnlock()
+	for idx := range uris {
+		c.adapter.Release(uris[idx])
+	}
 }
 
 // BytesToResponse converts bytes array into Response data structure.
@@ -174,11 +193,11 @@ func sortURLParams(URL *url.URL) {
 	URL.RawQuery = params.Encode()
 }
 
-func generateKey(URL string) uint64 {
+func generateKey(URL string) string {
 	hash := fnv.New64a()
 	hash.Write([]byte(URL))
 
-	return hash.Sum64()
+	return strconv.FormatUint(hash.Sum64(), 10)
 }
 
 // NewClient initializes the cache HTTP middleware client with the given
@@ -198,6 +217,9 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	if int64(c.ttl) < 1 {
 		return nil, errors.New("cache client ttl is not set")
 	}
+
+	c.urisWithKeys = make(map[string][]string)
+	c.mutex = sync.RWMutex{}
 
 	return c, nil
 }

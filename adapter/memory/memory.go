@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/victorspringer/http-cache"
+	"github.com/Columbus-internet/http-cache"
 )
 
 // Algorithm is the string type for caching algorithms labels.
@@ -55,14 +55,14 @@ type Adapter struct {
 	mutex     sync.RWMutex
 	capacity  int
 	algorithm Algorithm
-	store     map[uint64][]byte
+	store     map[string][]byte
 }
 
 // AdapterOptions is used to set Adapter settings.
 type AdapterOptions func(a *Adapter) error
 
 // Get implements the cache Adapter interface Get method.
-func (a *Adapter) Get(key uint64) ([]byte, bool) {
+func (a *Adapter) Get(key string) ([]byte, bool) {
 	a.mutex.RLock()
 	response, ok := a.store[key]
 	a.mutex.RUnlock()
@@ -75,7 +75,7 @@ func (a *Adapter) Get(key uint64) ([]byte, bool) {
 }
 
 // Set implements the cache Adapter interface Set method.
-func (a *Adapter) Set(key uint64, response []byte, expiration time.Time) {
+func (a *Adapter) Set(key string, response []byte, expiration time.Time) {
 	a.mutex.RLock()
 	length := len(a.store)
 	a.mutex.RUnlock()
@@ -90,7 +90,7 @@ func (a *Adapter) Set(key uint64, response []byte, expiration time.Time) {
 }
 
 // Release implements the Adapter interface Release method.
-func (a *Adapter) Release(key uint64) {
+func (a *Adapter) Release(key string) {
 	a.mutex.RLock()
 	_, ok := a.store[key]
 	a.mutex.RUnlock()
@@ -103,7 +103,7 @@ func (a *Adapter) Release(key uint64) {
 }
 
 func (a *Adapter) evict() {
-	selectedKey := uint64(0)
+	selectedKey := ""
 	lastAccess := time.Now()
 	frequency := 2147483647
 
@@ -162,7 +162,7 @@ func NewAdapter(opts ...AdapterOptions) (cache.Adapter, error) {
 	}
 
 	a.mutex = sync.RWMutex{}
-	a.store = make(map[uint64][]byte, a.capacity)
+	a.store = make(map[string][]byte, a.capacity)
 
 	return a, nil
 }

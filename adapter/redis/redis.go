@@ -25,7 +25,6 @@ SOFTWARE.
 package redis
 
 import (
-	"strconv"
 	"time"
 
 	cache "github.com/Columbus-internet/http-cache"
@@ -43,9 +42,9 @@ type Adapter struct {
 type RingOptions redis.RingOptions
 
 // Get implements the cache Adapter interface Get method.
-func (a *Adapter) Get(key uint64) ([]byte, bool) {
+func (a *Adapter) Get(key string) ([]byte, bool) {
 	var c []byte
-	if err := a.store.Get(strconv.FormatUint(key, 10), &c); err == nil {
+	if err := a.store.Get(key, &c); err == nil {
 		return c, true
 	}
 
@@ -53,17 +52,17 @@ func (a *Adapter) Get(key uint64) ([]byte, bool) {
 }
 
 // Set implements the cache Adapter interface Set method.
-func (a *Adapter) Set(key uint64, response []byte, expiration time.Time) {
+func (a *Adapter) Set(key string, response []byte, expiration time.Time) {
 	a.store.Set(&redisCache.Item{
-		Key:        strconv.FormatUint(key, 10),
+		Key:        key,
 		Object:     response,
 		Expiration: expiration.Sub(time.Now()),
 	})
 }
 
 // Release implements the cache Adapter interface Release method.
-func (a *Adapter) Release(key uint64) {
-	a.store.Delete(strconv.FormatUint(key, 10))
+func (a *Adapter) Release(key string) {
+	a.store.Delete(key)
 }
 
 // NewAdapter initializes Redis adapter.

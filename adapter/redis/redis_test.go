@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/victorspringer/http-cache"
+	"github.com/Columbus-internet/http-cache"
 )
 
 var a cache.Adapter
@@ -19,12 +19,12 @@ func TestSet(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		key      uint64
+		key      string
 		response []byte
 	}{
 		{
 			"sets a response cache",
-			1,
+			"1",
 			cache.Response{
 				Value:      []byte("value 1"),
 				Expiration: time.Now().Add(1 * time.Minute),
@@ -32,7 +32,7 @@ func TestSet(t *testing.T) {
 		},
 		{
 			"sets a response cache",
-			2,
+			"2",
 			cache.Response{
 				Value:      []byte("value 2"),
 				Expiration: time.Now().Add(1 * time.Minute),
@@ -40,7 +40,7 @@ func TestSet(t *testing.T) {
 		},
 		{
 			"sets a response cache",
-			3,
+			"3",
 			cache.Response{
 				Value:      []byte("value 3"),
 				Expiration: time.Now().Add(1 * time.Minute),
@@ -57,25 +57,25 @@ func TestSet(t *testing.T) {
 func TestGet(t *testing.T) {
 	tests := []struct {
 		name string
-		key  uint64
+		key  string
 		want []byte
 		ok   bool
 	}{
 		{
 			"returns right response",
-			1,
+			"1",
 			[]byte("value 1"),
 			true,
 		},
 		{
 			"returns right response",
-			2,
+			"2",
 			[]byte("value 2"),
 			true,
 		},
 		{
 			"key does not exist",
-			4,
+			"4",
 			nil,
 			false,
 		},
@@ -98,23 +98,23 @@ func TestGet(t *testing.T) {
 func TestRelease(t *testing.T) {
 	tests := []struct {
 		name string
-		key  uint64
+		key  string
 	}{
 		{
 			"removes cached response from store",
-			1,
+			"1",
 		},
 		{
 			"removes cached response from store",
-			2,
+			"2",
 		},
 		{
 			"removes cached response from store",
-			3,
+			"3",
 		},
 		{
 			"key does not exist",
-			4,
+			"4",
 		},
 	}
 	for _, tt := range tests {

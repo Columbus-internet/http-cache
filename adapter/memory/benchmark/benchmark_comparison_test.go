@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	cache "github.com/Columbus-internet/http-cache"
+	"github.com/Columbus-internet/http-cache/adapter/memory"
 	"github.com/allegro/bigcache"
-	cache "github.com/victorspringer/http-cache"
-	"github.com/victorspringer/http-cache/adapter/memory"
 )
 
 const maxEntrySize = 256
@@ -15,7 +15,7 @@ const maxEntrySize = 256
 func BenchmarkHTTPCacheMamoryAdapterSet(b *testing.B) {
 	cache, expiration := initHTTPCacheMamoryAdapter(b.N)
 	for i := 0; i < b.N; i++ {
-		cache.Set(uint64(i), value(), expiration)
+		cache.Set(string(i), value(), expiration)
 	}
 }
 
@@ -30,12 +30,12 @@ func BenchmarkHTTPCacheMamoryAdapterGet(b *testing.B) {
 	b.StopTimer()
 	cache, expiration := initHTTPCacheMamoryAdapter(b.N)
 	for i := 0; i < b.N; i++ {
-		cache.Set(uint64(i), value(), expiration)
+		cache.Set(string(i), value(), expiration)
 	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		cache.Get(uint64(i))
+		cache.Get(string(i))
 	}
 }
 
@@ -84,14 +84,14 @@ func BenchmarkHTTPCacheMemoryAdapterGetParallel(b *testing.B) {
 	b.StopTimer()
 	cache, expiration := initHTTPCacheMamoryAdapter(b.N)
 	for i := 0; i < b.N; i++ {
-		cache.Set(uint64(i), value(), expiration)
+		cache.Set(string(i), value(), expiration)
 	}
 
 	b.StartTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		counter := 0
 		for pb.Next() {
-			cache.Get(uint64(counter))
+			cache.Get(string(counter))
 			counter = counter + 1
 		}
 	})
@@ -118,8 +118,8 @@ func value() []byte {
 	return make([]byte, 100)
 }
 
-func parallelKey(threadID int, counter int) uint64 {
-	return uint64(threadID)
+func parallelKey(threadID int, counter int) string {
+	return string(threadID)
 }
 
 func initHTTPCacheMamoryAdapter(entries int) (cache.Adapter, time.Time) {
