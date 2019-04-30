@@ -93,7 +93,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 			sortURLParams(r.URL)
 			prefix := r.URL.Path + "_"
 			key := generateKey(r.URL.String())
-
+			key = prefix + key
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
 				delete(params, c.refreshKey)
@@ -101,7 +101,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 				r.URL.RawQuery = params.Encode()
 				key = generateKey(r.URL.String())
 
-				c.adapter.Release(key)
+				c.adapter.Release(prefix + key)
 			} else {
 				b, ok := c.adapter.Get(key)
 				response := BytesToResponse(b)
