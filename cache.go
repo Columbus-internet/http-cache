@@ -92,9 +92,9 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" || r.Method == "" {
 			sortURLParams(r.URL)
-			prefix := r.URL.Path + "_"
+			prefix := r.URL.Path
 			key := generateKey(r.URL.String())
-			key = prefix + key
+			key = prefix + "_" + key
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
 				delete(params, c.refreshKey)
@@ -102,7 +102,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 				r.URL.RawQuery = params.Encode()
 				key = generateKey(r.URL.String())
 
-				c.adapter.Release(prefix + key)
+				c.adapter.Release(prefix + "_" + key)
 			} else {
 				b, ok := c.adapter.Get(key)
 				response := BytesToResponse(b)
