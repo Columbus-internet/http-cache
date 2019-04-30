@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -160,7 +161,9 @@ func (c *Client) ReleaseURI(uri string) {
 	c.mutex.RLock()
 	uris := c.urisWithKeys[uri]
 	c.mutex.RUnlock()
+	log.Printf("\tURI %s", uri)
 	for idx := range uris {
+		log.Printf("\treleasing %s", uris[idx])
 		c.adapter.Release(uris[idx])
 	}
 }
