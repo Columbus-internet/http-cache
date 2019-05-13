@@ -30,14 +30,12 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -66,9 +64,6 @@ type Client struct {
 	adapter    Adapter
 	ttl        time.Duration
 	refreshKey string
-
-	mutex        sync.RWMutex
-	urisWithKeys map[string][]string
 }
 
 // ClientOption is used to set Client settings.
@@ -78,13 +73,14 @@ type ClientOption func(c *Client) error
 type Adapter interface {
 	// Get retrieves the cached response by a given key. It also
 	// returns true or false, whether it exists or not.
-	Get(key string) ([]byte, bool)
+	Get(prefix, key string) ([]byte, bool)
 
-	// Set caches a response for a given key until an expiration date.
-	Set(key string, response []byte, expiration time.Time)
+	Set(prefix, key string, response []byte)
 
 	// Release frees cache for a given key.
-	Release(key string)
+	Release(prefix, key string)
+
+	ReleasePrefix(prefix string)
 }
 
 // Middleware is the HTTP cache middleware handler.
@@ -94,7 +90,6 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 			sortURLParams(r.URL)
 			prefix := r.URL.Path
 			key := generateKey(r.URL.String())
-			key = prefix + "_" + key
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
 				delete(params, c.refreshKey)
@@ -102,15 +97,15 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 				r.URL.RawQuery = params.Encode()
 				key = generateKey(r.URL.String())
 
-				c.adapter.Release(prefix + "_" + key)
+				c.adapter.Release(prefix, key)
 			} else {
-				b, ok := c.adapter.Get(key)
+				b, ok := c.adapter.Get(prefix, key)
 				response := BytesToResponse(b)
 				if ok {
 					if response.Expiration.After(time.Now()) {
 						response.LastAccess = time.Now()
 						response.Frequency++
-						c.adapter.Set(key, response.Bytes(), response.Expiration)
+						c.adapter.Set(prefix, key, response.Bytes())
 
 						//w.WriteHeader(http.StatusNotModified)
 						for k, v := range response.Header {
@@ -120,7 +115,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 						return
 					}
 
-					c.adapter.Release(key)
+					c.adapter.Release(prefix, key)
 				}
 			}
 
@@ -140,10 +135,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 					LastAccess: now,
 					Frequency:  1,
 				}
-				c.adapter.Set(key, response.Bytes(), response.Expiration)
-				c.mutex.Lock()
-				c.urisWithKeys[prefix] = append(c.urisWithKeys[prefix], key)
-				c.mutex.Unlock()
+				c.adapter.Set(prefix, key, response.Bytes())
 			}
 			for k, v := range result.Header {
 				w.Header().Set(k, strings.Join(v, ","))
@@ -158,14 +150,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 
 // ReleaseURI ...
 func (c *Client) ReleaseURI(uri string) {
-	c.mutex.RLock()
-	uris := c.urisWithKeys[uri]
-	c.mutex.RUnlock()
-	log.Printf("\tURI %s", uri)
-	for idx := range uris {
-		log.Printf("\treleasing %s", uris[idx])
-		c.adapter.Release(uris[idx])
-	}
+	c.adapter.ReleasePrefix(uri)
 }
 
 // BytesToResponse converts bytes array into Response data structure.
@@ -220,9 +205,6 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	if int64(c.ttl) < 1 {
 		return nil, errors.New("cache client ttl is not set")
 	}
-
-	c.urisWithKeys = make(map[string][]string)
-	c.mutex = sync.RWMutex{}
 
 	return c, nil
 }
