@@ -88,7 +88,6 @@ type Adapter interface {
 // Middleware is the HTTP cache middleware handler.
 func (c *Client) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("c.debugOutputEnabled = %v\n", c.debugOutputEnabled)
 		if r.Method == "GET" || r.Method == "" {
 			sortURLParams(r.URL)
 			prefix := r.URL.Path
