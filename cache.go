@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -61,9 +62,10 @@ type Response struct {
 
 // Client data structure for HTTP cache middleware.
 type Client struct {
-	adapter    Adapter
-	ttl        time.Duration
-	refreshKey string
+	adapter            Adapter
+	ttl                time.Duration
+	refreshKey         string
+	debugOutputEnabled bool
 }
 
 // ClientOption is used to set Client settings.
@@ -92,6 +94,9 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 			key := generateKey(r.URL.String())
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
+				if c.debugOutputEnabled {
+					log.Printf("refresh key found, releasing key %s:%s\n", prefix, key)
+				}
 				delete(params, c.refreshKey)
 
 				r.URL.RawQuery = params.Encode()
@@ -103,6 +108,9 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 				response := BytesToResponse(b)
 				if ok {
 					if response.Expiration.After(time.Now()) {
+						if c.debugOutputEnabled {
+							log.Printf("serving from cache %s:%s\n", prefix, key)
+						}
 						response.LastAccess = time.Now()
 						response.Frequency++
 						c.adapter.Set(prefix, key, response.Bytes())
@@ -114,11 +122,15 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 						w.Write(response.Value)
 						return
 					}
-
+					if c.debugOutputEnabled {
+						log.Printf("requested object is in cache, but expried - releasing %s:%s\n", prefix, key)
+					}
 					c.adapter.Release(prefix, key)
 				}
 			}
-
+			if c.debugOutputEnabled {
+				log.Printf("requested object is not in cache or expired - getting %s:%s from DB\n", prefix, key)
+			}
 			rec := httptest.NewRecorder()
 			next.ServeHTTP(rec, r)
 			result := rec.Result()
@@ -192,6 +204,7 @@ func generateKey(URL string) string {
 // options.
 func NewClient(opts ...ClientOption) (*Client, error) {
 	c := &Client{}
+	c.debugOutputEnabled = false
 
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
@@ -236,6 +249,15 @@ func ClientWithTTL(ttl time.Duration) ClientOption {
 func ClientWithRefreshKey(refreshKey string) ClientOption {
 	return func(c *Client) error {
 		c.refreshKey = refreshKey
+		return nil
+	}
+}
+
+// ClientWithDebugOutput sets the parameter key used to switch client debug
+// output. Optional setting.
+func ClientWithDebugOutput(debugOutputEnabled bool) ClientOption {
+	return func(c *Client) error {
+		c.debugOutputEnabled = debugOutputEnabled
 		return nil
 	}
 }
