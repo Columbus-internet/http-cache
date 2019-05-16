@@ -165,6 +165,15 @@ func (c *Client) ReleaseURI(uri string) {
 	c.adapter.ReleasePrefix(uri)
 }
 
+// Release ...
+func (c *Client) Release(uri string) {
+	url, _ := url.Parse(uri)
+	sortURLParams(url)
+	prefix := url.Path
+	key := generateKey(url.String())
+	c.adapter.Release(prefix, key)
+}
+
 // BytesToResponse converts bytes array into Response data structure.
 func BytesToResponse(b []byte) Response {
 	var r Response
