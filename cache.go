@@ -83,6 +83,7 @@ type Adapter interface {
 	Release(prefix, key string)
 
 	ReleasePrefix(prefix string)
+	ReleaseIfStartsWith(key string)
 }
 
 // Middleware is the HTTP cache middleware handler.
@@ -163,6 +164,11 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 // ReleaseURI ...
 func (c *Client) ReleaseURI(uri string) {
 	c.adapter.ReleasePrefix(uri)
+}
+
+// ReleaseIfStartsWith ...
+func (c *Client) ReleaseIfStartsWith(uri string) {
+	c.adapter.ReleaseIfStartsWith(uri)
 }
 
 // Release ...

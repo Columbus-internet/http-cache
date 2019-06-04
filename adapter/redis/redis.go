@@ -60,6 +60,25 @@ func (a *Adapter) ReleasePrefix(prefix string) {
 	a.ring.Del(prefix)
 }
 
+// ReleaseIfStartsWith ...
+func (a *Adapter) ReleaseIfStartsWith(key string) {
+
+	for {
+		var keys []string
+		var cursor uint64
+		//var err error
+		keys, cursor, _ = a.ring.Scan(cursor, key+"*", 100).Result()
+
+		for idx := range keys {
+			a.ring.Del(keys[idx])
+		}
+
+		if cursor == 0 {
+			break
+		}
+	}
+}
+
 // NewAdapter initializes Redis adapter.
 func NewAdapter(opt *RingOptions) cache.Adapter {
 	ropt := redis.RingOptions(*opt)
