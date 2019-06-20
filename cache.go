@@ -120,15 +120,11 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 						w.Write(response.Value)
 						return
 					}
-					if c.log != nil {
-						ctxlog.Debug("requested object is in cache, but expried - releasing")
-					}
+					ctxlog.Debug("requested object is in cache, but expried - releasing")
 					c.adapter.Release(prefix, key)
 				}
 			}
-			if c.log != nil {
-				ctxlog.Debug("requested object is not in cache or expired - taking it from DB")
-			}
+			ctxlog.Debug("requested object is not in cache or expired - taking it from DB")
 			responce, value := c.PutItemToCache(next, r, prefix, key)
 			for k, v := range responce.Header {
 				w.Header().Set(k, strings.Join(v, ","))
