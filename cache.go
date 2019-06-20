@@ -90,9 +90,7 @@ type Adapter interface {
 func (c *Client) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" || r.Method == "" {
-			sortURLParams(r.URL)
-			prefix := r.URL.Path
-			key := generateKey(r.URL.String())
+			prefix, key := c.GeneratePrefixAndKey(r)
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
 				if c.debugOutputEnabled {
@@ -132,33 +130,47 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 			if c.debugOutputEnabled {
 				log.Printf("requested object is not in cache or expired - getting %s:%s from DB\n", prefix, key)
 			}
-			rec := httptest.NewRecorder()
-			next.ServeHTTP(rec, r)
-			result := rec.Result()
-
-			statusCode := result.StatusCode
-			value := rec.Body.Bytes()
-			if statusCode < 400 {
-				now := time.Now()
-
-				response := Response{
-					Value:      value,
-					Header:     result.Header,
-					Expiration: now.Add(c.ttl),
-					LastAccess: now,
-					Frequency:  1,
-				}
-				c.adapter.Set(prefix, key, response.Bytes())
-			}
-			for k, v := range result.Header {
+			responce, value := c.PutItemToCache(next, r, prefix, key)
+			for k, v := range responce.Header {
 				w.Header().Set(k, strings.Join(v, ","))
 			}
-			w.WriteHeader(statusCode)
+			w.WriteHeader(responce.StatusCode)
 			w.Write(value)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// GeneratePrefixAndKey ...
+func (c *Client) GeneratePrefixAndKey(r *http.Request) (prefix, key string) {
+	sortURLParams(r.URL)
+	prefix = r.URL.Path
+	key = generateKey(r.URL.String())
+	return
+}
+
+// PutItemToCache ...
+func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key string) (result *http.Response, value []byte) {
+	rec := httptest.NewRecorder()
+	next.ServeHTTP(rec, r)
+	result = rec.Result()
+
+	statusCode := result.StatusCode
+	value = rec.Body.Bytes()
+	if statusCode < 400 {
+		now := time.Now()
+
+		response := Response{
+			Value:      value,
+			Header:     result.Header,
+			Expiration: now.Add(c.ttl),
+			LastAccess: now,
+			Frequency:  1,
+		}
+		c.adapter.Set(prefix, key, response.Bytes())
+	}
+	return
 }
 
 // ReleaseURI ...
