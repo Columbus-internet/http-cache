@@ -59,6 +59,8 @@ type Response struct {
 	// Frequency is the count of times a cached response is accessed.
 	// Used for LFU and MFU algorithms.
 	Frequency int
+
+	CachedAt time.Time
 }
 
 // Client data structure for HTTP cache middleware.
@@ -116,7 +118,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 						for k, v := range response.Header {
 							w.Header().Set(k, strings.Join(v, ","))
 						}
-						w.Header().Set("X-Served-By-Redis", "true")
+						w.Header().Set("X-Cached-At", response.CachedAt.Format(time.RFC822Z))
 						w.Write(response.Value)
 						return
 					}
@@ -129,6 +131,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 			for k, v := range responce.Header {
 				w.Header().Set(k, strings.Join(v, ","))
 			}
+			w.Header().Set("X-Cached-At", time.Now().Format(time.RFC822Z))
 			w.WriteHeader(responce.StatusCode)
 			w.Write(value)
 			return
@@ -166,6 +169,7 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 			Expiration: now.Add(c.ttl),
 			LastAccess: now,
 			Frequency:  1,
+			CachedAt:   now,
 		}
 		c.adapter.Set(prefix, key, response.Bytes())
 	} else {
