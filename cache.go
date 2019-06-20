@@ -30,7 +30,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -38,6 +37,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Response is the cached response data structure.
@@ -62,10 +63,10 @@ type Response struct {
 
 // Client data structure for HTTP cache middleware.
 type Client struct {
-	adapter            Adapter
-	ttl                time.Duration
-	refreshKey         string
-	debugOutputEnabled bool
+	adapter    Adapter
+	ttl        time.Duration
+	refreshKey string
+	log        *log.Logger
 }
 
 // ClientOption is used to set Client settings.
@@ -91,11 +92,10 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" || r.Method == "" {
 			prefix, key := c.GeneratePrefixAndKey(r)
+			ctxlog := c.log.WithFields(log.Fields{"prefix": prefix, "key": key})
 			params := r.URL.Query()
 			if _, ok := params[c.refreshKey]; ok {
-				if c.debugOutputEnabled {
-					log.Printf("refresh key found, releasing key %s:%s\n", prefix, key)
-				}
+				ctxlog.Debug("refresh key found, releasing")
 				delete(params, c.refreshKey)
 
 				r.URL.RawQuery = params.Encode()
@@ -107,9 +107,7 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 				response := BytesToResponse(b)
 				if ok {
 					if response.Expiration.After(time.Now()) {
-						if c.debugOutputEnabled {
-							log.Printf("serving from cache %s:%s\n", prefix, key)
-						}
+						ctxlog.Debug("serving from cache")
 						response.LastAccess = time.Now()
 						response.Frequency++
 						c.adapter.Set(prefix, key, response.Bytes())
@@ -118,17 +116,18 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 						for k, v := range response.Header {
 							w.Header().Set(k, strings.Join(v, ","))
 						}
+						w.Header().Set("X-Served-By-Redis", "true")
 						w.Write(response.Value)
 						return
 					}
-					if c.debugOutputEnabled {
-						log.Printf("requested object is in cache, but expried - releasing %s:%s\n", prefix, key)
+					if c.log != nil {
+						ctxlog.Debug("requested object is in cache, but expried - releasing")
 					}
 					c.adapter.Release(prefix, key)
 				}
 			}
-			if c.debugOutputEnabled {
-				log.Printf("requested object is not in cache or expired - getting %s:%s from DB\n", prefix, key)
+			if c.log != nil {
+				ctxlog.Debug("requested object is not in cache or expired - taking it from DB")
 			}
 			responce, value := c.PutItemToCache(next, r, prefix, key)
 			for k, v := range responce.Header {
@@ -152,6 +151,8 @@ func (c *Client) GeneratePrefixAndKey(r *http.Request) (prefix, key string) {
 
 // PutItemToCache ...
 func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key string) (result *http.Response, value []byte) {
+	ctxlog := c.log.WithFields(log.Fields{"prefix": prefix, "key": key, "resource": r.URL.String()})
+	ctxlog.Debug("calling http recorder")
 	rec := httptest.NewRecorder()
 	next.ServeHTTP(rec, r)
 	result = rec.Result()
@@ -159,6 +160,7 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 	statusCode := result.StatusCode
 	value = rec.Body.Bytes()
 	if statusCode < 400 {
+		ctxlog.Logger.WithField("status", statusCode).Debug("all fine")
 		now := time.Now()
 
 		response := Response{
@@ -169,6 +171,8 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 			Frequency:  1,
 		}
 		c.adapter.Set(prefix, key, response.Bytes())
+	} else {
+		ctxlog.Logger.WithFields(log.Fields{"status": statusCode, "value": string(value)}).Debug("got error")
 	}
 	return
 }
@@ -231,7 +235,7 @@ func generateKey(URL string) string {
 // options.
 func NewClient(opts ...ClientOption) (*Client, error) {
 	c := &Client{}
-	c.debugOutputEnabled = false
+	c.log = log.StandardLogger()
 
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
@@ -280,11 +284,10 @@ func ClientWithRefreshKey(refreshKey string) ClientOption {
 	}
 }
 
-// ClientWithDebugOutput sets the parameter key used to switch client debug
-// output. Optional setting.
-func ClientWithDebugOutput(debugOutputEnabled bool) ClientOption {
+// ClientWithLogger ...
+func ClientWithDebugOutput(logger *log.Logger) ClientOption {
 	return func(c *Client) error {
-		c.debugOutputEnabled = debugOutputEnabled
+		c.log = logger
 		return nil
 	}
 }
