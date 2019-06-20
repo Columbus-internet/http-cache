@@ -285,7 +285,7 @@ func ClientWithRefreshKey(refreshKey string) ClientOption {
 }
 
 // ClientWithLogger ...
-func ClientWithDebugOutput(logger *log.Logger) ClientOption {
+func ClientWithLogger(logger *log.Logger) ClientOption {
 	return func(c *Client) error {
 		c.log = logger
 		return nil
