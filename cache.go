@@ -160,7 +160,8 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 	statusCode := result.StatusCode
 	value = rec.Body.Bytes()
 	if statusCode < 400 {
-		ctxlog.Logger.WithField("status", statusCode).Debug("all fine")
+		ctxlog.Data["status"] = statusCode
+		ctxlog.Debug("all fine")
 		now := time.Now()
 
 		response := Response{
@@ -172,7 +173,9 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 		}
 		c.adapter.Set(prefix, key, response.Bytes())
 	} else {
-		ctxlog.Logger.WithFields(log.Fields{"status": statusCode, "value": string(value)}).Debug("got error")
+		ctxlog.Data["status"] = statusCode
+		ctxlog.Data["value"] = string(value)
+		ctxlog.Debug("got error")
 	}
 	return
 }
