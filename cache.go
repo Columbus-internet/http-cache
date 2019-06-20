@@ -151,7 +151,7 @@ func (c *Client) GeneratePrefixAndKey(r *http.Request) (prefix, key string) {
 // PutItemToCache ...
 func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key string) (result *http.Response, value []byte) {
 	ctxlog := c.log.WithFields(log.Fields{"prefix": prefix, "key": key, "resource": r.URL.String()})
-	ctxlog.Debug("calling http recorder")
+	ctxlog.Trace("calling http recorder")
 	rec := httptest.NewRecorder()
 	next.ServeHTTP(rec, r)
 	result = rec.Result()
@@ -160,7 +160,7 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 	value = rec.Body.Bytes()
 	if statusCode < 400 {
 		ctxlog.Data["status"] = statusCode
-		ctxlog.Debug("all fine")
+		ctxlog.Trace("all fine")
 		now := time.Now()
 
 		response := Response{
@@ -175,7 +175,7 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 	} else {
 		ctxlog.Data["status"] = statusCode
 		ctxlog.Data["value"] = string(value)
-		ctxlog.Debug("got error")
+		ctxlog.Trace("got error")
 	}
 	return
 }
