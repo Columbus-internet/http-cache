@@ -45,6 +45,14 @@ func (a *Adapter) Get(prefix, key string) ([]byte, bool) {
 	return nil, false
 }
 
+// Exists ...
+func (a *Adapter) Exists(prefix, key string) bool {
+	if c, err := a.ring.HExists(prefix, key).Result(); err == nil {
+		return c
+	}
+	return false
+}
+
 // Set implements the cache Adapter interface Set method.
 func (a *Adapter) Set(prefix, key string, response []byte) {
 	a.ring.HSet(prefix, key, response)

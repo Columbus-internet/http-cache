@@ -80,6 +80,8 @@ type Adapter interface {
 	// returns true or false, whether it exists or not.
 	Get(prefix, key string) ([]byte, bool)
 
+	Exists(prefix, key string) bool
+
 	Set(prefix, key string, response []byte)
 
 	// Release frees cache for a given key.
@@ -178,6 +180,16 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 		ctxlog.Trace("got error")
 	}
 	return
+}
+
+// Exists ...
+func (c *Client) Exists(uri string) bool {
+	url, _ := url.Parse(uri)
+	sortURLParams(url)
+	prefix := url.Path
+	key := generateKey(url.String())
+
+	return c.adapter.Exists(prefix, key)
 }
 
 // ReleaseURI ...
