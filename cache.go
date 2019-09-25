@@ -129,12 +129,12 @@ func (c *Client) Middleware(next http.Handler) http.Handler {
 				}
 			}
 			ctxlog.Debug("requested object is not in cache or expired - taking it from DB")
-			responce, value := c.PutItemToCache(next, r, prefix, key)
-			for k, v := range responce.Header {
+			response, value := c.PutItemToCache(next, r, prefix, key)
+			for k, v := range response.Header {
 				w.Header().Set(k, strings.Join(v, ","))
 			}
 			w.Header().Set("X-Cached-At", time.Now().Format(time.RFC822Z))
-			w.WriteHeader(responce.StatusCode)
+			w.WriteHeader(response.StatusCode)
 			w.Write(value)
 			return
 		}
