@@ -159,9 +159,15 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 	result = rec.Result()
 
 	statusCode := result.StatusCode
+	ctxlog.Data["status"] = statusCode
+
+	if result.StatusCode == http.StatusNotFound {
+		ctxlog.Trace("the item is NotFound now, removing it from cache")
+		c.adapter.Release(prefix, key)
+		return
+	}
 	value = rec.Body.Bytes()
 	if statusCode < 400 {
-		ctxlog.Data["status"] = statusCode
 		ctxlog.Trace("all fine")
 		now := time.Now()
 
@@ -175,7 +181,6 @@ func (c *Client) PutItemToCache(next http.Handler, r *http.Request, prefix, key 
 		}
 		c.adapter.Set(prefix, key, response.Bytes())
 	} else {
-		ctxlog.Data["status"] = statusCode
 		ctxlog.Data["value"] = string(value)
 		ctxlog.Trace("got error")
 	}
